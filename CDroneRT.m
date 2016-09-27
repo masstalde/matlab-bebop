@@ -19,7 +19,6 @@ classdef CDroneRT<handle
         
         simulation
         m_flying = 0;
-        m_flying_last = 0;
         m_takeoff
         
         
@@ -45,20 +44,9 @@ classdef CDroneRT<handle
         setp_mot_pub
         setp_mot_msg
         
-        gimbal_pub
-        gimbal_msg
-        
-        img_sub
-        img_info_sub
-        
         pos_sub
-        pos_msg
-        
-        h_img
-        h_bb
-        
-        lifestream
-        
+        pos_msg   
+                    
         tf
         
         estimator
@@ -67,7 +55,7 @@ classdef CDroneRT<handle
     
     methods
         
-        function obj=CDroneRT(quadID,h_img,lifestream,simulation)
+        function obj=CDroneRT(quadID, vicon_name, simulation)
             obj.id=quadID;
             
             obj.simulation=simulation;
@@ -78,8 +66,6 @@ classdef CDroneRT<handle
             
             obj.vel_d = [0;0;0];
             
-            obj.lifestream=lifestream;
-            obj.h_img= h_img;
             
             if obj.simulation==1
                 %% define all the ros subscribers and publishers
@@ -94,24 +80,9 @@ classdef CDroneRT<handle
                 
                 obj.setp_pos_pub = rospublisher(['/q',num2str(quadID),'/bebop/cmd_pos'], 'nav_msgs/Odometry','IsLatching', false);
                 obj.setp_pos_msg = rosmessage(rostype.nav_msgs_Odometry);
-                
-                obj.gimbal_pub = rospublisher(['/q',num2str(quadID),'/bebop/camera_control'], 'geometry_msgs/Twist','IsLatching', false);
-                obj.gimbal_msg = rosmessage(rostype.geometry_msgs_Twist);
-                
-                %obj.tf = RosTransformListener('world','q1\base_link');
-                if obj.lifestream==1
-                    %obj.img_sub = rossubscriber(['/q',num2str(quadID),'/front_cam/camera/image/compressed'],'sensor_msgs/CompressedImage', 'BufferSize', 1);
-                    %obj.img_sub = rossubscriber(['/q',num2str(quadID),'/front_cam/camera/image'],'sensor_msgs/Image',@(h,e)obj.Image_callback2(), 'BufferSize', 1);
-                     obj.img_sub = rossubscriber(['/q',num2str(quadID),'/front_cam/camera/image'],'sensor_msgs/Image', 'BufferSize', 1);
-                    obj.img_info_sub = rossubscriber(['/q',num2str(quadID),'/real/camera_info'],'sensor_msgs/CameraInfo', 'BufferSize', 1);
-                    I=readImage(obj.img_sub.LatestMessage);
-                    h_img =  subimage(I);
-                    uistack(h_img, 'bottom')
-                    obj.h_img= h_img;
-                end
+
                 obj.pos_sub = rossubscriber(['/q',num2str(quadID),'/ground_truth/state'],'nav_msgs/Odometry', 'BufferSize', 1);
-                
-                
+               
                 
             else
                 %% define all the ros subscribers and publishers
@@ -124,31 +95,11 @@ classdef CDroneRT<handle
                 obj.setp_vel_pub = rospublisher(['/q',num2str(quadID),'/real/cmd_vel'], 'geometry_msgs/Twist','IsLatching', false);
                 obj.setp_vel_msg = rosmessage(rostype.geometry_msgs_Twist);
                 
-                obj.setp_pos_pub = rospublisher(['/q',num2str(quadID),'/real/cmd_pos'], 'nav_msgs/Odometry','IsLatching', false);
-                obj.setp_pos_msg = rosmessage(rostype.nav_msgs_Odometry);
-                
-                obj.gimbal_pub = rospublisher(['/q',num2str(quadID),'/real/camera_control'], 'geometry_msgs/Twist','IsLatching', false);
-                obj.gimbal_msg = rosmessage(rostype.geometry_msgs_Twist);
-                
-                %obj.tf = RosTransformListener('world','q1\base_link');
-                if obj.lifestream==1
-                    %obj.img_sub = rossubscriber(['/q',num2str(quadID),'/front_cam/camera/image/compressed'],'sensor_msgs/CompressedImage', 'BufferSize', 1);
-                   % obj.img_sub = rossubscriber(['/q',num2str(quadID),'/real/image_raw'],'sensor_msgs/Image',@(h,e)obj.Image_callback2(), 'BufferSize', 1);
-                    %obj.img_sub = rossubscriber(['/q',num2str(quadID),'/real/image_raw/compressed'],'sensor_msgs/CompressedImage',@(h,e)obj.Image_callback2(), 'BufferSize', 1);
-                     obj.img_sub = rossubscriber(['/q',num2str(quadID),'/real/image_raw'],'sensor_msgs/Image', 'BufferSize', 1);
-                    obj.img_info_sub = rossubscriber(['/q',num2str(quadID),'/real/front_cam/camera/camera_info'],'sensor_msgs/CameraInfo', 'BufferSize', 1);
-                   try
-                    I=readImage(obj.img_sub.LatestMessage);
-                    pause(2)
-                    h_img =  subimage(I);
-                    uistack(h_img, 'bottom')
-                    obj.h_img= h_img;
-                   catch
-                   end
-                end
-                name = 'vicon/Bebop2_Lukas/Bebop2_Lukas';
-                obj.tf = RosTransformListener('world', 'vicon/Bebop2_Lukas/Bebop2_Lukas');
-                obj.pos_sub = rossubscriber(name,'geometry_msgs/TransformStamped');
+%                 obj.setp_pos_pub = rospublisher(['/q',num2str(quadID),'/real/cmd_pos'], 'nav_msgs/Odometry','IsLatching', false);
+%                 obj.setp_pos_msg = rosmessage(rostype.nav_msgs_Odometry);
+         
+                obj.tf = RosTransformListener('world', vicon_name);
+                obj.pos_sub = rossubscriber(vicon_name,'geometry_msgs/TransformStamped');
                 %
             end
             
@@ -168,13 +119,13 @@ classdef CDroneRT<handle
             
             [pos_filt,vel_filt,q]=obj.getPoseAndVel();
             obj.q = q;
+            
             if obj.m_auto
                 vel_d = obj.controller.step(pos_filt,vel_filt,[0;0;1]);
-                vel_d(1:2) = -vel_d(1:2)
                 velYaw = Joy.yawSpeed;
             end
             if obj.m_manual
-                vel_d = Joy.vel
+                vel_d = Joy.vel;
                velYaw= Joy.yawSpeed;
             end
             

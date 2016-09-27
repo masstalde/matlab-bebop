@@ -29,7 +29,7 @@ classdef CJoy<handle
     methods
         
         function obj=CJoy()
-            obj.Joy_sub = rossubscriber('/joy','sensor_msgs/Joy',@obj.Joycallback);
+            obj.Joy_sub = rossubscriber('/joy','sensor_msgs/Joy',@obj.Joycallback, 'BufferSize', 100);
             
             
         end
